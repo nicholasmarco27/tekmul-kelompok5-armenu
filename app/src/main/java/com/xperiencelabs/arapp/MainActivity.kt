@@ -2,6 +2,7 @@ package com.xperiencelabs.arapp
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.MediaPlayer
 import android.opengl.Visibility
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -23,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sceneView: ArSceneView
     lateinit var placeButton: ExtendedFloatingActionButton
     private lateinit var modelNode: ArModelNode
+    private lateinit var mediaPlayer: MediaPlayer
 
     // Food model buttons
     private lateinit var hamburgerButton: Button
@@ -31,10 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var geprekButton: Button
 
     // Current selected model
-    private var currentModel = "hamburger"
-
-    // Track if model is placed
-    private var isModelPlaced = false
+    private var currentModel = "burger"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +42,8 @@ class MainActivity : AppCompatActivity() {
         sceneView = findViewById<ArSceneView?>(R.id.sceneView).apply {
             this.lightEstimationMode = Config.LightEstimationMode.DISABLED
         }
+
+        mediaPlayer = MediaPlayer.create(this,R.raw.ad)
 
         placeButton = findViewById(R.id.place)
         placeButton.setOnClickListener {
@@ -56,13 +57,13 @@ class MainActivity : AppCompatActivity() {
         geprekButton = findViewById(R.id.geprekButton)
 
         // Set click listeners for food model buttons
-        hamburgerButton.setOnClickListener { changeModel("hamburger") }
+        hamburgerButton.setOnClickListener { changeModel("burger") }
         ramenButton.setOnClickListener { changeModel("ramen") }
         tacoButton.setOnClickListener { changeModel("taco") }
         geprekButton.setOnClickListener { changeModel("geprek") }
 
         // Initialize model node with default hamburger model
-        createModelNode("hamburger")
+        createModelNode("burger")
     }
 
     private fun createModelNode(modelName: String) {
@@ -71,27 +72,24 @@ class MainActivity : AppCompatActivity() {
             sceneView.removeChild(modelNode)
         }
 
-        // Reset model placed state when creating a new model
-        isModelPlaced = false
+        // Show place button when creating a new model
         placeButton.visibility = View.VISIBLE
+        placeButton.text = "Place"
 
         // Create new model node with selected model
         modelNode = ArModelNode(sceneView.engine, PlacementMode.INSTANT).apply {
             loadModelGlbAsync(
                 glbFileLocation = "models/$modelName.glb",
-                scaleToUnits = 1f,
-                centerOrigin = Position(-0.5f)
+                scaleToUnits = 0.2f,
             ) {
                 sceneView.planeRenderer.isVisible = true
             }
-            // Only update our tracked state, don't directly modify button visibility here
             onAnchorChanged = {
-                isModelPlaced = it != null
-                // Update button text instead of hiding it
                 if (it != null) {
+                    // Model is anchored (placed)
                     placeButton.text = "Placed"
-                } else {
-                    placeButton.text = "Place"
+                    placeButton.visibility = View.GONE
+                    sceneView.planeRenderer.isVisible = false
                 }
             }
         }
@@ -103,31 +101,22 @@ class MainActivity : AppCompatActivity() {
     private fun changeModel(modelName: String) {
         if (currentModel != modelName) {
             currentModel = modelName
-
-            // Reset placement when changing models
-            if (modelNode.isAnchored) {
-                modelNode.detachAnchor()
-                sceneView.planeRenderer.isVisible = true
-            }
-
-            // Create new model node with selected model
             createModelNode(modelName)
         }
     }
 
     private fun placeModel() {
-        // Only place if not already placed
-        if (!isModelPlaced) {
+        if (!modelNode.isAnchored) {
             modelNode.anchor()
-            sceneView.planeRenderer.isVisible = false
-            placeButton.text = "Placed"
-            isModelPlaced = true
-        } else {
-            // If already placed, allow repositioning
-            modelNode.detachAnchor()
-            sceneView.planeRenderer.isVisible = true
-            placeButton.text = "Place"
-            isModelPlaced = false
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mediaPlayer.stop()
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaPlayer.release()
     }
 }
